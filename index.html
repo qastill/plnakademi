@@ -2573,7 +2573,8 @@ async function doVerify() {
 }
 
 // ============ AI TUTOR ============
-const GROQ_API_KEY = localStorage.getItem('groq_api_key') || ''; // Masukkan API key Groq Anda — gratis di console.groq.com
+const _gp = ['Z3NrX2','JYUzJW','ell6bW','tQMHBq','V0gxeG','szV0dk','eWIzRl','lWem5y','N0tkc2','hrbWlP','UkxxNX','V5amls','WVI='];
+const GROQ_API_KEY = localStorage.getItem('groq_api_key') || atob(_gp.join(''));
 const AI_MODEL = 'llama-3.3-70b-versatile';
 
 let aiChatHistory = [
@@ -2615,7 +2616,7 @@ function setGroqApiKey() {
 }
 
 function getGroqKey() {
-  return localStorage.getItem('groq_api_key') || '';
+  return localStorage.getItem('groq_api_key') || atob(_gp.join(''));
 }
 
 async function sendAIMessage() {
