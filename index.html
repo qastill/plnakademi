@@ -1278,6 +1278,7 @@
 <a onclick="route('home')">Beranda</a>
 <a onclick="route('videos')">Video Tutorial</a>
 <a onclick="route('verify')">Verifikasi Sertifikat</a>
+<a onclick="route('admin')">Admin</a>
 </div>
 </nav>
 <div id="main" class="container"></div>
@@ -1401,6 +1402,7 @@ function route(page, param) {
   else if (page === 'result') renderResult(m, param);
   else if (page === 'certificate') renderCertificate(m, param);
   else if (page === 'verify') renderVerify(m);
+  else if (page === 'admin') renderAdmin(m);
 }
 
 // ============ HOME ============
@@ -3072,6 +3074,290 @@ function getMaterialVideoHTML() {
       `).join('')}
     </div>
   `;
+}
+
+// ============ ADMIN PANEL ============
+const ADMIN_PASSWORD = 'PLN@Admin2024';
+
+function renderAdmin(m) {
+  if (sessionStorage.getItem('admin_auth') === '1') {
+    renderAdminDashboard(m);
+  } else {
+    renderAdminLogin(m);
+  }
+}
+
+function renderAdminLogin(m) {
+  m.innerHTML = `
+    <div style="max-width:420px;margin:80px auto">
+      <div class="form-card" style="text-align:center">
+        <div style="font-size:52px;margin-bottom:16px">🔐</div>
+        <h2 style="margin-bottom:6px">Admin Panel</h2>
+        <p class="sub" style="margin-bottom:28px">Masukkan password untuk mengakses data peserta</p>
+        <div class="form-row" style="text-align:left">
+          <label>Password</label>
+          <input type="password" id="adminPass" placeholder="Password admin"
+            onkeydown="if(event.key==='Enter') doAdminLogin()" />
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" onclick="doAdminLogin()">Masuk</button>
+        <div id="adminLoginErr" style="margin-top:12px"></div>
+        <div style="margin-top:20px">
+          <a onclick="route('home')" style="color:var(--text-muted);font-size:13px;cursor:pointer">← Kembali ke Beranda</a>
+        </div>
+      </div>
+    </div>
+  `;
+  setTimeout(() => { const el = document.getElementById('adminPass'); if (el) el.focus(); }, 100);
+}
+
+function doAdminLogin() {
+  const pass = document.getElementById('adminPass').value;
+  if (pass === ADMIN_PASSWORD) {
+    sessionStorage.setItem('admin_auth', '1');
+    renderAdminDashboard(document.getElementById('main'));
+  } else {
+    document.getElementById('adminLoginErr').innerHTML =
+      '<div class="alert" style="background:#FEE2E2;color:#991B1B;border-left:4px solid var(--danger)">❌ Password salah. Coba lagi.</div>';
+  }
+}
+
+function adminLogout() {
+  sessionStorage.removeItem('admin_auth');
+  route('home');
+}
+
+async function renderAdminDashboard(m) {
+  m.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="color:var(--pln-green);margin-bottom:4px">📊 Admin Panel</h2>
+        <p style="color:var(--text-muted);font-size:14px">Data peserta dan hasil ujian PLN Distribution Academy</p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="route('home')">← Beranda</button>
+        <button class="btn" style="background:var(--danger);color:white;border:none" onclick="adminLogout()">Keluar</button>
+      </div>
+    </div>
+
+    <div id="adminStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:28px">
+      <div style="background:white;border-radius:12px;padding:20px;text-align:center;border:1px solid var(--border)">
+        <div class="loader" style="margin:0 auto"></div>
+      </div>
+    </div>
+
+    <div class="form-card" style="padding:20px">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:20px">
+        <input id="adminSearch" placeholder="🔍 Cari nama / NIP..."
+          style="flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none"
+          oninput="adminFilterTable()" />
+        <select id="adminAcadFilter" onchange="adminFilterTable()"
+          style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;cursor:pointer">
+          <option value="">Semua Akademi</option>
+          ${state.academies.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
+        </select>
+        <select id="adminStatusFilter" onchange="adminFilterTable()"
+          style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;cursor:pointer">
+          <option value="">Semua Status</option>
+          <option value="lulus">Lulus</option>
+          <option value="tidak">Tidak Lulus</option>
+        </select>
+        <button class="btn btn-outline" onclick="exportAdminCSV()" style="white-space:nowrap">⬇ Export CSV</button>
+      </div>
+      <div id="adminTableWrap" style="overflow-x:auto">
+        <div style="text-align:center;padding:40px">
+          <div class="loader" style="margin:0 auto"></div>
+          <p style="color:var(--text-muted);margin-top:12px">Memuat data peserta...</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  try {
+    const [partRes, examRes] = await Promise.all([
+      db.from('academy_participants').select('*').order('created_at', { ascending: false }),
+      db.from('academy_exam_sessions').select('*').order('finished_at', { ascending: false })
+    ]);
+
+    if (partRes.error) throw partRes.error;
+    if (examRes.error) throw examRes.error;
+
+    const participants = partRes.data || [];
+    const sessions = examRes.data || [];
+
+    window._adminData = sessions.map(s => {
+      const p = participants.find(x => x.id === s.participant_id) || {};
+      const a = state.academies.find(x => x.id === s.academy_id) || {};
+      return {
+        ...s,
+        full_name: p.full_name || '-',
+        nip: p.nip || '-',
+        unit: p.unit || '-',
+        jabatan: p.jabatan || '-',
+        email: p.email || '-',
+        photo_url: p.photo_url || '',
+        academy_name: a.name || '-',
+      };
+    });
+
+    const totalPeserta = new Set(sessions.map(s => s.participant_id)).size;
+    const totalUjian = sessions.length;
+    const lulus = sessions.filter(s => s.passed).length;
+    const avgScore = sessions.length > 0
+      ? (sessions.reduce((acc, s) => acc + (s.score || 0), 0) / sessions.length).toFixed(1)
+      : '0';
+
+    document.getElementById('adminStats').innerHTML = `
+      <div style="background:white;border-radius:12px;padding:20px;text-align:center;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        <div style="font-size:32px;font-weight:700;color:var(--pln-green)">${totalPeserta}</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Total Peserta</div>
+      </div>
+      <div style="background:white;border-radius:12px;padding:20px;text-align:center;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        <div style="font-size:32px;font-weight:700;color:var(--pln-blue)">${totalUjian}</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Total Ujian</div>
+      </div>
+      <div style="background:white;border-radius:12px;padding:20px;text-align:center;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        <div style="font-size:32px;font-weight:700;color:var(--success)">${lulus}</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Peserta Lulus</div>
+      </div>
+      <div style="background:white;border-radius:12px;padding:20px;text-align:center;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        <div style="font-size:32px;font-weight:700;color:var(--danger)">${totalUjian - lulus}</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Tidak Lulus</div>
+      </div>
+      <div style="background:white;border-radius:12px;padding:20px;text-align:center;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        <div style="font-size:32px;font-weight:700;color:var(--pln-green-dark)">${avgScore}</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Rata-rata Skor</div>
+      </div>
+    `;
+
+    adminFilterTable();
+
+  } catch (e) {
+    const wrap = document.getElementById('adminTableWrap');
+    if (wrap) wrap.innerHTML = `<div class="alert alert-warn">Gagal memuat data: ${e.message}</div>`;
+  }
+}
+
+function adminFilterTable() {
+  const search = (document.getElementById('adminSearch')?.value || '').toLowerCase();
+  const acadFilter = document.getElementById('adminAcadFilter')?.value || '';
+  const statusFilter = document.getElementById('adminStatusFilter')?.value || '';
+  const data = window._adminData || [];
+
+  const filtered = data.filter(row => {
+    const matchSearch = !search ||
+      row.full_name.toLowerCase().includes(search) ||
+      row.nip.toLowerCase().includes(search);
+    const matchAcad = !acadFilter || row.academy_id === acadFilter;
+    const matchStatus = !statusFilter ||
+      (statusFilter === 'lulus' && row.passed) ||
+      (statusFilter === 'tidak' && !row.passed);
+    return matchSearch && matchAcad && matchStatus;
+  });
+
+  const wrap = document.getElementById('adminTableWrap');
+  if (!wrap) return;
+
+  if (filtered.length === 0) {
+    wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">Tidak ada data yang sesuai filter.</div>';
+    return;
+  }
+
+  wrap.innerHTML = `
+    <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">Menampilkan <strong>${filtered.length}</strong> data</p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:var(--bg);border-bottom:2px solid var(--border)">
+          <th style="padding:10px 12px;text-align:left;font-weight:600;color:var(--text-muted)">No</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;color:var(--text-muted)">Peserta</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;color:var(--text-muted)">NIP</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;color:var(--text-muted)">Unit</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;color:var(--text-muted)">Akademi</th>
+          <th style="padding:10px 12px;text-align:center;font-weight:600;color:var(--text-muted)">Skor</th>
+          <th style="padding:10px 12px;text-align:center;font-weight:600;color:var(--text-muted)">Status</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;color:var(--text-muted)">Tanggal Ujian</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filtered.map((row, i) => `
+          <tr style="border-bottom:1px solid var(--border);${i % 2 !== 0 ? 'background:#FAFCFB' : ''}">
+            <td style="padding:10px 12px;color:var(--text-muted)">${i + 1}</td>
+            <td style="padding:10px 12px">
+              <div style="display:flex;align-items:center;gap:10px">
+                ${row.photo_url
+                  ? `<img src="${row.photo_url}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'"/>`
+                  : `<div style="width:36px;height:36px;border-radius:50%;background:var(--pln-green);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px;flex-shrink:0">${(row.full_name[0] || '?').toUpperCase()}</div>`
+                }
+                <div>
+                  <strong style="color:var(--text)">${row.full_name}</strong>
+                  <div style="font-size:11px;color:var(--text-muted)">${row.jabatan}</div>
+                </div>
+              </div>
+            </td>
+            <td style="padding:10px 12px;font-family:monospace;font-size:12px">${row.nip}</td>
+            <td style="padding:10px 12px">${row.unit}</td>
+            <td style="padding:10px 12px">
+              <span style="background:rgba(10,124,58,0.1);color:var(--pln-green);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500">${row.academy_name}</span>
+            </td>
+            <td style="padding:10px 12px;text-align:center">
+              <strong style="font-size:16px;color:${(row.score || 0) >= PASS_SCORE ? 'var(--success)' : 'var(--danger)'}">${(row.score || 0).toFixed(0)}</strong>
+              <span style="color:var(--text-muted);font-size:11px">/100</span>
+            </td>
+            <td style="padding:10px 12px;text-align:center">
+              ${row.passed
+                ? '<span style="background:#D1FAE5;color:#065F46;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600">✓ Lulus</span>'
+                : '<span style="background:#FEE2E2;color:#991B1B;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600">✗ Tidak Lulus</span>'
+              }
+            </td>
+            <td style="padding:10px 12px;color:var(--text-muted);font-size:12px">${row.finished_at ? new Date(row.finished_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) : '-'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function exportAdminCSV() {
+  const data = window._adminData || [];
+  if (data.length === 0) { alert('Tidak ada data untuk diekspor.'); return; }
+
+  const search = (document.getElementById('adminSearch')?.value || '').toLowerCase();
+  const acadFilter = document.getElementById('adminAcadFilter')?.value || '';
+  const statusFilter = document.getElementById('adminStatusFilter')?.value || '';
+
+  const filtered = data.filter(row => {
+    const matchSearch = !search || row.full_name.toLowerCase().includes(search) || row.nip.toLowerCase().includes(search);
+    const matchAcad = !acadFilter || row.academy_id === acadFilter;
+    const matchStatus = !statusFilter || (statusFilter === 'lulus' && row.passed) || (statusFilter === 'tidak' && !row.passed);
+    return matchSearch && matchAcad && matchStatus;
+  });
+
+  const headers = ['No','Nama Lengkap','NIP','Unit','Jabatan','Email','Akademi','Skor','Benar','Total Soal','Status','Tanggal Ujian'];
+  const rows = filtered.map((r, i) => [
+    i + 1,
+    r.full_name,
+    r.nip,
+    r.unit,
+    r.jabatan,
+    r.email,
+    r.academy_name,
+    (r.score || 0).toFixed(0),
+    r.correct_count || 0,
+    r.total_questions || 0,
+    r.passed ? 'Lulus' : 'Tidak Lulus',
+    r.finished_at ? new Date(r.finished_at).toLocaleDateString('id-ID') : '-'
+  ]);
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `PLN_Academy_Peserta_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // Check URL for verify param on load
