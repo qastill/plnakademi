@@ -3080,7 +3080,7 @@ function getMaterialVideoHTML() {
 const ADMIN_PASSWORD = 'PLN@Admin2024';
 
 function renderAdmin(m) {
-  if (sessionStorage.getItem('admin_auth') === '1') {
+  if (localStorage.getItem('admin_auth') === '1') {
     renderAdminDashboard(m);
   } else {
     renderAdminLogin(m);
@@ -3113,7 +3113,7 @@ function renderAdminLogin(m) {
 function doAdminLogin() {
   const pass = document.getElementById('adminPass').value;
   if (pass === ADMIN_PASSWORD) {
-    sessionStorage.setItem('admin_auth', '1');
+    localStorage.setItem('admin_auth', '1');
     renderAdminDashboard(document.getElementById('main'));
   } else {
     document.getElementById('adminLoginErr').innerHTML =
@@ -3122,7 +3122,9 @@ function doAdminLogin() {
 }
 
 function adminLogout() {
-  sessionStorage.removeItem('admin_auth');
+  if (!confirm('Yakin ingin keluar dari Admin Panel?')) return;
+  localStorage.removeItem('admin_auth');
+  localStorage.removeItem('admin_filter_state');
   route('home');
 }
 
@@ -3149,13 +3151,13 @@ async function renderAdminDashboard(m) {
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:20px">
         <input id="adminSearch" placeholder="🔍 Cari nama / NIP..."
           style="flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none"
-          oninput="adminFilterTable()" />
-        <select id="adminAcadFilter" onchange="adminFilterTable()"
+          oninput="adminSaveAndFilter()" />
+        <select id="adminAcadFilter" onchange="adminSaveAndFilter()"
           style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;cursor:pointer">
           <option value="">Semua Akademi</option>
           ${state.academies.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
         </select>
-        <select id="adminStatusFilter" onchange="adminFilterTable()"
+        <select id="adminStatusFilter" onchange="adminSaveAndFilter()"
           style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;cursor:pointer">
           <option value="">Semua Status</option>
           <option value="lulus">Lulus</option>
@@ -3229,12 +3231,27 @@ async function renderAdminDashboard(m) {
       </div>
     `;
 
+    // Restore filter state yang tersimpan terakhir
+    const saved = JSON.parse(localStorage.getItem('admin_filter_state') || '{}');
+    if (saved.search) document.getElementById('adminSearch').value = saved.search;
+    if (saved.acad) document.getElementById('adminAcadFilter').value = saved.acad;
+    if (saved.status) document.getElementById('adminStatusFilter').value = saved.status;
+
     adminFilterTable();
 
   } catch (e) {
     const wrap = document.getElementById('adminTableWrap');
     if (wrap) wrap.innerHTML = `<div class="alert alert-warn">Gagal memuat data: ${e.message}</div>`;
   }
+}
+
+function adminSaveAndFilter() {
+  localStorage.setItem('admin_filter_state', JSON.stringify({
+    search: document.getElementById('adminSearch')?.value || '',
+    acad: document.getElementById('adminAcadFilter')?.value || '',
+    status: document.getElementById('adminStatusFilter')?.value || '',
+  }));
+  adminFilterTable();
 }
 
 function adminFilterTable() {
