@@ -1679,22 +1679,43 @@ function renderBiodata(m) {
 const CASE_STUDIES = {
   'p2tl': [
     {
-      title: 'Kasus 1: Pelanggan Industri dengan Lonjakan Pemakaian Tidak Wajar',
-      scenario: 'Pelanggan industri tekstil di ULP Indramayu Kota dengan daya 197 kVA tercatat pemakaian rata-rata 45.000 kWh/bulan selama 6 bulan terakhir, namun pada bulan ke-7 turun drastis menjadi 18.000 kWh padahal aktivitas produksi normal. Hasil pemeriksaan AMR menunjukkan tegangan fasa R-S-T normal, tapi arus pada salah satu fasa terbaca 0 selama jam operasional.',
+      title: 'Kasus 1: Pra Pemeriksaan — Penetapan Target Operasi Berbasis Data',
+      scenario: 'Tim P2TL UP3 Indramayu menyusun rencana operasi mingguan. Hasil analitik AMR memunculkan 12 calon target dengan indikasi anomali: drop pemakaian, ketidakseimbangan arus per fasa, dan susut tinggi di penyulang IDR-07. Tim menyiapkan Surat Tugas (SP), Tanda Pengenal, blangko Berita Acara P2TL, peralatan teknis (tang ampere, megger, kamera, segel cadangan, tool kit), serta koordinasi dengan Polri/PPNS untuk pengamanan operasi.',
       questions: [
-        'Apa kemungkinan jenis pelanggaran yang terjadi (Golongan I, II, III, atau IV)?',
-        'Tindakan apa yang harus dilakukan petugas P2TL saat di lokasi?',
-        'Bagaimana perhitungan tagihan susulan berdasarkan Permen ESDM?',
-        'Bukti apa saja yang harus didokumentasikan agar BAP sah secara hukum?'
+        'Bagaimana memilih Target Operasi (TO) yang tepat (right target) dari indikasi data tersebut?',
+        'Dokumen administrasi apa saja yang WAJIB disiapkan sebelum tim turun ke lapangan?',
+        'Mengapa kerjasama dengan Polri/TNI/PPNS diperlukan dalam fase Pra Pemeriksaan?',
+        'Bagaimana penyusunan jadwal operasi yang efektif & memperhatikan keamanan tim?'
       ]
     },
     {
-      title: 'Kasus 2: Segel kWh Meter Rusak Tanpa Tanda Pelanggaran Fisik',
-      scenario: 'Saat inspeksi rutin di ULP Jatibarang, petugas menemukan segel timah pada terminal kWh meter pelanggan rumah tangga R1/1300 VA dalam kondisi rusak (tidak utuh). Namun secara fisik tidak ada tanda jumper, kabel mencurigakan, atau perubahan instalasi. Pelanggan mengaku tidak pernah membuka segel.',
+      title: 'Kasus 2: Pelaksanaan Pemeriksaan — Eksekusi Lapangan & Pengamanan Bukti',
+      scenario: 'Tim P2TL tiba di lokasi pelanggan industri tekstil (197 kVA) yang menjadi target. Pelanggan/wakilnya hadir, dua saksi independen (RT & PPNS) ikut menyaksikan. Saat pemeriksaan ditemukan jumper kabel di terminal CT, segel timah rusak, dan body APP terdapat lubang kecil. Tim mendokumentasikan kondisi awal, proses, dan temuan, melakukan pemutusan sementara/bongkar APP, mengambil barang bukti (APP & jumper) dan memasang APP pengganti.',
       questions: [
-        'Apakah kondisi ini sudah cukup untuk dikategorikan sebagai pelanggaran?',
-        'Prosedur apa yang harus ditempuh sebelum memasang segel ulang?',
-        'Bagaimana sikap petugas jika pelanggan menolak menandatangani BAP?'
+        'Bagaimana etika & prosedur saat tiba di lokasi (sikap, identitas, peran saksi)?',
+        'Apa saja yang wajib didokumentasikan saat pemeriksaan fisik APP, segel, dan wiring?',
+        'Tindakan apa yang tepat ketika ditemukan pelanggaran (pemutusan, pengambilan bukti, APP pengganti)?',
+        'Bagaimana mekanisme pembuatan & penandatanganan BA, serta serah terima barang bukti di lokasi?'
+      ]
+    },
+    {
+      title: 'Kasus 3: Paska Pemeriksaan — Verifikasi, Analisa Lab & Penyelesaian Perkara',
+      scenario: 'Berkas hasil operasi (BA, foto, daftar barang bukti) dibawa ke back office UP3 Indramayu untuk verifikasi kelengkapan administrasi. APP yang disita dikirim ke laboratorium. Hasil analisa lab membuktikan adanya manipulasi pada pengukuran. Tim back office menetapkan jenis pelanggaran (P-II) dan menghitung Tagihan Susulan. Surat Panggilan dikirim untuk klarifikasi & penyelesaian perkara dengan pelanggan.',
+      questions: [
+        'Apa saja yang diverifikasi back office terhadap berkas dari tim lapangan?',
+        'Mengapa analisa lab penting dalam fase Paska Pemeriksaan?',
+        'Bagaimana proses penetapan jenis pelanggaran & perhitungan Tagihan Susulan (TS)?',
+        'Kapan & bagaimana penyambungan kembali listrik dilakukan setelah penyelesaian TS?'
+      ]
+    },
+    {
+      title: 'Kasus 4: Pick Point — Integritas, Bukti, Transparansi & K3',
+      scenario: 'Saat pemeriksaan, pelanggan menawarkan "kompensasi" agar tim tidak melanjutkan proses. Pelanggan juga menolak menandatangani BA. Di sisi lain, kondisi kerja basah/hujan dan ada potensi listrik bertegangan. Tim harus tetap menjaga integritas, kelengkapan bukti, transparansi pemeriksaan, dan keselamatan kerja.',
+      questions: [
+        'Bagaimana sikap petugas terhadap tawaran "kompensasi" dari pelanggan? (Integritas)',
+        'Bukti apa saja yang harus tetap didokumentasikan agar sah secara hukum? (Bukti)',
+        'Bagaimana petugas menjaga transparansi dan menyikapi pelanggan yang menolak menandatangani BA?',
+        'Kontrol K3 apa yang wajib dilakukan saat kondisi lapangan berisiko tinggi?'
       ]
     }
   ],
@@ -1994,10 +2015,10 @@ function generateMaterialVisuals(slug, idx, mat) {
       {icon: icons.chart, title: 'KPI Terukur', desc: 'NKO & SAIDI/SAIFI'},
     ],
     'p2tl': [
-      {icon: icons.shield, title: 'Perdir 0028.P/2023', desc: 'Landasan hukum P2TL'},
-      {icon: icons.warning, title: 'Deteksi Pelanggaran', desc: '4 jenis pelanggaran'},
-      {icon: icons.doc, title: 'BAP & OPAL', desc: 'Dokumentasi resmi'},
-      {icon: icons.chart, title: 'Tagihan Susulan', desc: 'Perhitungan denda'},
+      {icon: icons.target, title: 'Pra Pemeriksaan', desc: 'TO, jadwal, kerjasama Polri/PPNS, administrasi & teknis'},
+      {icon: icons.warning, title: 'Pelaksanaan', desc: 'Etika, pemeriksaan APP/segel/wiring, BA & saksi'},
+      {icon: icons.doc, title: 'Paska Pemeriksaan', desc: 'Verifikasi, analisa lab, TS, penyambungan kembali'},
+      {icon: icons.shield, title: 'Pick Point', desc: 'Integritas, Bukti, Transparansi & K3'},
     ],
     'k3': [
       {icon: icons.shield, title: 'APD Lengkap', desc: 'Helm, sarung tangan isolasi'},
@@ -2057,7 +2078,7 @@ function generateMindmap(slug, title) {
   const topics = {
     'yantek': ['Jaringan', 'Gangguan', 'Pemeliharaan', 'Pelayanan', 'K3'],
     'pp-gm': ['Pasang Baru', 'Perubahan Daya', 'kWh Meter', 'AP2T', 'SLO'],
-    'p2tl': ['4 Pelanggaran', 'Inspeksi', 'BAP/OPAL', 'Tagihan', 'Regulasi'],
+    'p2tl': ['Pra Pemeriksaan', 'Pelaksanaan', 'Paska Pemeriksaan', 'Bukti & BA', 'Integritas & K3'],
     'k3': ['APD', 'LOTO', 'Bahaya', 'Prosedur', 'SMK3'],
     'biller': ['Baca Meter', 'Validasi', 'AP2T', 'Anomali', 'Etika'],
     'instalatir': ['PUIL 2011', 'Material', 'Grounding', 'SLO', 'Sertifikasi'],
