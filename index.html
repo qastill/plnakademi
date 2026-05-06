@@ -577,7 +577,7 @@
     display: flex; justify-content: center;
   }
   .q-visual svg { max-width: 100%; height: auto; }
-  .q-text { font-size: 17px; font-weight: 600; color: var(--text); margin: 10px 0 20px; line-height: 1.5; }
+  .q-text { font-size: 17px; font-weight: 600; color: var(--text); margin: 10px 0 20px; line-height: 1.5; overflow-wrap: break-word; }
   .options { display: flex; flex-direction: column; gap: 10px; }
   .option {
     padding: 14px 18px; border: 2px solid var(--border); border-radius: 10px;
@@ -834,21 +834,44 @@
   .pillar-card { padding: 10px; }
   .pillar-card .pillar-title { font-size: 12px; }
   
-  /* Exam */
-  .exam-header { flex-direction: column; gap: 8px; text-align: center; }
-  .exam-progress { font-size: 13px; }
-  .timer { font-size: 14px; }
-  .q-number-big { font-size: 14px; }
-  .q-text { font-size: 14px; }
-  .q-diff-badge { font-size: 11px; }
-  .options .option { padding: 12px; font-size: 13px; }
-  .options .option .letter { min-width: 28px; height: 28px; font-size: 12px; }
-  
-  /* Stage Indicator */
-  .stage-indicator { flex-wrap: wrap; justify-content: center; gap: 4px; }
-  .stage-dot { width: 28px; height: 28px; font-size: 12px; }
-  .stage-line { width: 20px; }
-  .stage-label { font-size: 12px; text-align: center; }
+  /* Exam — compact mobile */
+  .exam-header {
+    flex-direction: row; gap: 10px; text-align: left;
+    padding: 10px 14px; margin-bottom: 10px; border-radius: 10px;
+    position: sticky; top: 8px; z-index: 50;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  .exam-progress { font-size: 12px; flex: 1; }
+  .timer { font-size: 16px; font-weight: 800; white-space: nowrap; }
+  .question-card { padding: 14px 14px; margin-bottom: 12px; border-radius: 12px; }
+  .q-top-row { gap: 8px; margin-bottom: 8px; }
+  .q-category-badge {
+    padding: 4px 10px; font-size: 11px; gap: 4px;
+    margin-bottom: 0; max-width: 60%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .q-category-badge svg { width: 12px; height: 12px; flex-shrink: 0; }
+  .q-diff-badge { padding: 3px 8px; font-size: 10px; }
+  .q-number-big { font-size: 11px; margin-bottom: 6px; letter-spacing: 0.5px; }
+  .q-text { font-size: 15px; line-height: 1.45; margin: 6px 0 14px; font-weight: 600; }
+  .options { gap: 8px; }
+  .options .option { padding: 10px 12px; font-size: 14px; gap: 10px; border-radius: 10px; }
+  .options .option .letter { min-width: 30px; height: 30px; font-size: 13px; }
+
+  /* Sticky bottom buttons agar selalu mudah di-tap */
+  .exam-bottom-bar {
+    position: sticky; bottom: 0; z-index: 40;
+    background: var(--bg); padding: 10px 0 8px;
+    margin-top: 8px;
+  }
+  .exam-bottom-bar .btn { padding: 12px 14px; font-size: 14px; }
+
+  /* Stage Indicator — compact */
+  .stage-indicator { flex-wrap: nowrap; justify-content: center; gap: 3px; margin: 6px 0 4px; }
+  .stage-dot { width: 24px; height: 24px; font-size: 11px; border-width: 1.5px; }
+  .stage-dot.active { transform: scale(1.05); box-shadow: 0 0 0 2px rgba(10,124,58,0.2); }
+  .stage-line { width: 16px; height: 2px; }
+  .stage-label { font-size: 11px; text-align: center; margin-bottom: 6px; }
   
   /* Stage Break */
   .break-card { padding: 20px 16px; }
@@ -1414,34 +1437,24 @@ async function init() {
     }
     state.academies = data;
 
-    // Cek apakah ada ujian yang belum selesai (refresh / tab tertutup)
+    // Auto-resume: kalau ada ujian belum selesai (refresh/tab tertutup), langsung lanjut tanpa tanya
     const persisted = getPersistedExam();
     if (persisted && persisted.participant && persisted.currentAcademy) {
-      const academyName = persisted.currentAcademy.name || 'academy';
-      const stage = (persisted.examCurrentStage || 0) + 1;
-      const total = persisted.examQuestions.length;
-      const answered = Object.keys(persisted.examAnswers || {}).length;
-      const ok = confirm(
-        `Anda memiliki ujian yang belum selesai:\n` +
-        `• Academy: ${academyName}\n` +
-        `• Stage: ${stage}/${EXAM_STAGES}\n` +
-        `• Sudah terjawab: ${answered}/${total} soal\n\n` +
-        `Lanjutkan ujian dari tempat terakhir?\n(OK = lanjut, Cancel = mulai ulang dari beranda)`
-      );
-      if (ok) {
-        state.participant = persisted.participant;
-        state.currentAcademy = persisted.currentAcademy;
-        state.examQuestions = persisted.examQuestions;
-        state.examAnswers = persisted.examAnswers || {};
-        state.examCurrentIdx = persisted.examCurrentIdx || 0;
-        state.examCurrentStage = persisted.examCurrentStage || 0;
-        state.examStartTime = persisted.examStartTime || Date.now();
-        state.examInProgress = true;
-        route('exam');
-        return;
-      } else {
-        clearPersistedExam();
-      }
+      state.participant = persisted.participant;
+      state.currentAcademy = persisted.currentAcademy;
+      state.examQuestions = persisted.examQuestions;
+      state.examAnswers = persisted.examAnswers || {};
+      state.examCurrentIdx = persisted.examCurrentIdx || 0;
+      state.examCurrentStage = persisted.examCurrentStage || 0;
+      state.examStartTime = persisted.examStartTime || Date.now();
+      state.examInProgress = true;
+      // Sinkronkan materials supaya navigation balik ke materi tetap konsisten
+      try {
+        const { data: mats } = await db.from('academy_materials').select('*').eq('academy_id', state.currentAcademy.id).order('order_num');
+        state.materials = mats || [];
+      } catch (e) { /* abaikan, lanjut */ }
+      route('exam');
+      return;
     }
 
     route('home');
@@ -2280,9 +2293,9 @@ function renderExamStart(m) {
       <div class="timer" id="timer">⏰ ${MINUTES_PER_STAGE}:00</div>
     </div>
     <div id="questionWrap"></div>
-    <div style="display:flex;justify-content:space-between;gap:12px;margin-top:20px">
-      <button class="btn btn-outline" id="prevBtn" onclick="prevQ()">← Sebelumnya</button>
-      <button class="btn btn-secondary" id="nextBtn" onclick="nextQ()">Selanjutnya →</button>
+    <div class="exam-bottom-bar" style="display:flex;justify-content:space-between;gap:10px">
+      <button class="btn btn-outline" id="prevBtn" onclick="prevQ()" style="flex:1;max-width:140px">← Sebelumnya</button>
+      <button class="btn btn-secondary" id="nextBtn" onclick="nextQ()" style="flex:2">Selanjutnya →</button>
     </div>
   `;
   renderQuestion();
