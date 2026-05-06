@@ -670,6 +670,11 @@
   .cert-seal-label { font-size: 9px; font-weight: 800; letter-spacing: 1.2px; margin-top: 2px; }
   .cert-seal-sub { font-size: 8px; font-style: italic; opacity: 0.9; margin-top: 1px; }
 
+  /* Showcase mini — preview di app */
+  @media (min-width: 1100px) {
+    .cert-showcase-mini { width: 900px !important; }
+  }
+
   /* UTILITIES */
   .hidden { display: none !important; }
   .loader {
@@ -1503,6 +1508,7 @@ function route(page, param) {
   else if (page === 'stagebreak') renderStageBreak(m);
   else if (page === 'result') renderResult(m, param);
   else if (page === 'certificate') renderCertificate(m, param);
+  else if (page === 'cert-showcase') renderCertShowcase(m);
   else if (page === 'verify') renderVerify(m);
   else if (page === 'admin') renderAdmin(m);
 }
@@ -1558,12 +1564,12 @@ function renderHome(m) {
         <h4>AI Tutor Interaktif</h4>
         <p>Tanya jawab realtime dengan AI yang memahami konteks PLN distribusi</p>
       </div>
-      <div class="feature-item">
+      <div class="feature-item" style="cursor:pointer" onclick="route('cert-showcase')" title="Klik untuk lihat contoh sertifikat">
         <div class="feature-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
         </div>
         <h4>Sertifikat Digital</h4>
-        <p>QR code verifikasi, dapat diunduh PDF dan dibagikan ke HR</p>
+        <p>QR code verifikasi, dapat diunduh PDF, 3 tingkatan A/B/C — <strong style="color:var(--pln-green)">klik lihat contoh →</strong></p>
       </div>
     </div>
 
@@ -2848,6 +2854,111 @@ async function downloadCert() {
   const y = (pageH - h) / 2;
   pdf.addImage(imgData, 'PNG', x, y, w, h);
   pdf.save(`Sertifikat_${state.participant.full_name}_${state.currentAcademy.slug}.pdf`);
+}
+
+// ============ CERT SHOWCASE (preview 3 tingkatan) ============
+function renderCertShowcase(m) {
+  const navLogoEl = document.querySelector('nav img');
+  const plnLogoSrc = navLogoEl ? navLogoEl.src : (IMG.logo || '');
+  const today = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const samples = [
+    {
+      tier: getCertTier(94), score: 94, name: 'Budi Santoso', nip: '89123456', unit: 'UP3 Indramayu',
+      certNum: 'PLN-ACAD/P2TL/2026/A1B2C3D4E5F6',
+      desc: '🏆 Performa terbaik. Diberikan kepada peserta dengan skor ≥ 90. Border & seal warna emas.',
+    },
+    {
+      tier: getCertTier(85), score: 85, name: 'Siti Aminah', nip: '88654321', unit: 'UP3 Cirebon',
+      certNum: 'PLN-ACAD/P2TL/2026/G7H8I9J0K1L2',
+      desc: '🥈 Hasil baik. Diberikan untuk skor 80–89. Border & seal warna hijau PLN (default).',
+    },
+    {
+      tier: getCertTier(76), score: 76, name: 'Andi Wijaya', nip: '90123789', unit: 'UP3 Garut',
+      certNum: 'PLN-ACAD/P2TL/2026/M3N4O5P6Q7R8',
+      desc: '🥉 Lulus ambang batas. Diberikan untuk skor 75–79. Border & seal warna biru.',
+    },
+  ];
+
+  const renderSampleCert = (s) => `
+    <div style="background:#F8FAFC;padding:18px;border-radius:14px;margin-bottom:30px">
+      <div style="background:${s.tier.ribbonBg};color:white;padding:8px 16px;border-radius:8px;font-weight:700;font-size:14px;margin-bottom:14px;display:inline-block">
+        Grade ${s.tier.letter} — ${s.tier.label} (skor ${s.score})
+      </div>
+      <p style="color:var(--text-muted);font-size:13px;margin:0 0 14px">${s.desc}</p>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <div class="cert-container cert-showcase-mini" style="border-color:${s.tier.borderColor};margin:0;width:900px">
+          <div class="cert-border" style="border-color:${s.tier.innerBorder}"></div>
+          <div class="cert-seal" style="background:${s.tier.sealBg};color:${s.tier.sealColor}">
+            <div class="cert-seal-letter">${s.tier.letter}</div>
+            <div class="cert-seal-label">${s.tier.label}</div>
+            <div class="cert-seal-sub">${s.tier.sublabel}</div>
+          </div>
+          <div class="cert-header">
+            <div class="cert-logo-row">
+              ${plnLogoSrc ? `<img src="${plnLogoSrc}" style="height:70px;width:auto;object-fit:contain;border-radius:8px" alt="PLN" />` : `<div class="cert-logo-box">PLN</div>`}
+              <div class="cert-org">PT PLN (Persero)<small>Distribution Academy</small></div>
+            </div>
+            <div class="cert-title">SERTIFIKAT ${s.tier.letter === 'A' ? 'DENGAN PUJIAN' : 'KELULUSAN'}</div>
+            <div class="cert-subtitle">Certificate of ${s.tier.letter === 'A' ? 'Distinction' : 'Completion'}</div>
+          </div>
+          <div class="cert-body">
+            <div class="cert-photo" style="background:linear-gradient(135deg,#E5E7EB,#9CA3AF);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:36px;border-color:${s.tier.innerBorder}">${s.name.charAt(0)}</div>
+            <p>Diberikan kepada</p>
+            <div class="cert-name" style="color:${s.tier.borderColor};border-bottom-color:${s.tier.innerBorder}">${s.name}</div>
+            <p>NIP: ${s.nip} • ${s.unit}</p>
+            <p style="margin-top:16px">Telah menyelesaikan dan lulus</p>
+            <div class="cert-academy">Academy P2TL</div>
+            <p>dengan skor <strong style="color:${s.tier.borderColor};font-size:22px">${s.score}</strong> / 100 — Grade <strong style="color:${s.tier.borderColor};font-size:18px">${s.tier.letter}</strong> (${s.tier.label})</p>
+          </div>
+          <div class="cert-footer">
+            <div class="cert-footer-col">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:30px">Diterbitkan pada<br/>${today}</div>
+              <div class="line"><div class="name">PLN Distribution Academy</div></div>
+            </div>
+            <div>
+              <div class="cert-qr" style="background:${s.tier.borderColor};display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700">[ QR CODE ]</div>
+            </div>
+            <div class="cert-footer-col">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:30px">No. Sertifikat<br/><strong style="color:var(--text);font-size:10px">${s.certNum}</strong></div>
+              <div class="line"><div class="name">Verified via QR</div></div>
+            </div>
+          </div>
+          <div class="cert-meta">Sertifikat ini dapat diverifikasi secara online melalui PLN Distribution Academy</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  m.innerHTML = `
+    <button class="btn btn-outline" onclick="route('home')" style="margin-bottom:18px">← Kembali ke Beranda</button>
+
+    <div style="text-align:center;margin-bottom:24px">
+      <h1 style="color:var(--pln-green);margin:0 0 6px">📜 Sertifikat Digital — 3 Tingkatan</h1>
+      <p style="color:var(--text-muted);max-width:720px;margin:0 auto;line-height:1.6">
+        Setelah lulus ujian (skor ≥ 75), peserta otomatis mendapat sertifikat digital dengan QR code verifikasi.
+        Sertifikat memiliki <strong>3 tingkatan visual berbeda</strong> sesuai capaian skor:
+      </p>
+    </div>
+
+    <div style="background:#FFFCE8;border-left:4px solid #FFE500;padding:14px 18px;border-radius:10px;margin:0 auto 24px;max-width:760px;font-size:14px;line-height:1.6;color:#444">
+      <strong style="color:#806A00">Cara mendapatkan:</strong>
+      <ul style="margin:6px 0 0;padding-left:20px">
+        <li>Lulus ujian academy (skor ≥ 75 dari 100 soal)</li>
+        <li>Sertifikat akan terbit otomatis (tanpa tombol)</li>
+        <li>Bisa langsung di-download sebagai PDF dari halaman hasil</li>
+        <li>Dapat diverifikasi online via QR code di halaman <em>Verifikasi Sertifikat</em></li>
+      </ul>
+    </div>
+
+    ${samples.map(renderSampleCert).join('')}
+
+    <div style="text-align:center;margin:30px 0">
+      <button class="btn btn-primary btn-lg" onclick="route('home')">← Kembali ke Beranda</button>
+      <button class="btn btn-outline btn-lg" onclick="route('verify')">🔍 Verifikasi Sertifikat</button>
+    </div>
+  `;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ============ VERIFY ============
