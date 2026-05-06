@@ -655,6 +655,21 @@
   .cert-qr { width: 100px; height: 100px; }
   .cert-meta { text-align: center; margin-top: 20px; font-size: 11px; color: var(--text-muted); }
 
+  /* Cert Seal — beda warna per tier (A/B/C) */
+  .cert-seal {
+    position: absolute; top: 30px; right: 30px;
+    width: 120px; height: 120px; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+    z-index: 2;
+    border: 4px solid rgba(255,255,255,0.85);
+    text-align: center;
+    transform: rotate(-8deg);
+  }
+  .cert-seal-letter { font-size: 44px; font-weight: 900; line-height: 1; letter-spacing: -1px; }
+  .cert-seal-label { font-size: 9px; font-weight: 800; letter-spacing: 1.2px; margin-top: 2px; }
+  .cert-seal-sub { font-size: 8px; font-style: italic; opacity: 0.9; margin-top: 1px; }
+
   /* UTILITIES */
   .hidden { display: none !important; }
   .loader {
@@ -2431,6 +2446,24 @@ function renderStageBreak(m) {
   }
   const totalScore = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
 
+  // Personalisasi: panggil nama depan & pesan semangat sesuai performa stage
+  const fullName = (state.participant?.full_name || 'Peserta').trim();
+  const firstName = fullName.split(' ')[0];
+  let pep, headline, headlineColor, emoji;
+  if (stageScore >= 90) {
+    emoji = '🔥'; headline = 'Luar Biasa!'; headlineColor = '#0A7C3A';
+    pep = `Hebat sekali, <strong>${firstName}</strong>! Stage ini kamu kuasai. Pertahankan momentum & fokusmu di stage berikutnya.`;
+  } else if (stageScore >= 75) {
+    emoji = '👏'; headline = 'Kerja Bagus!'; headlineColor = '#0A7C3A';
+    pep = `Mantap, <strong>${firstName}</strong>! Kamu sudah di jalur yang benar. Lanjutkan dengan tenang & teliti.`;
+  } else if (stageScore >= 60) {
+    emoji = '💪'; headline = 'Tetap Semangat!'; headlineColor = '#B45309';
+    pep = `Sudah cukup baik, <strong>${firstName}</strong>. Manfaatkan istirahat ini untuk recharge — masih ada stage berikutnya yang bisa kamu taklukkan.`;
+  } else {
+    emoji = '⚡'; headline = 'Jangan Menyerah!'; headlineColor = '#B45309';
+    pep = `Tarik napas dulu ya, <strong>${firstName}</strong>. Setiap soal adalah kesempatan untuk bangkit. Baca pertanyaan dengan tenang & percaya diri pada stage berikutnya.`;
+  }
+
   m.innerHTML = `
     <div class="stage-break-container">
       <div class="stage-indicator">
@@ -2440,18 +2473,17 @@ function renderStageBreak(m) {
         `).join('')}
       </div>
       <div class="break-card">
-        <div class="break-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
+        <div class="break-icon" style="font-size:48px;line-height:1">${emoji}</div>
+        <h2 style="color:${headlineColor};margin:8px 0 4px">${headline}</h2>
+        <p class="break-subtitle"><strong>${firstName}</strong> baru saja menyelesaikan <strong>Stage ${stageNum + 1}</strong> — ${STAGE_LABELS[stageNum]}</p>
+
+        <div class="break-pep" style="background:#FFFCE8;border-left:4px solid #FFE500;padding:14px 16px;border-radius:8px;margin:18px 0;text-align:left;font-size:14px;line-height:1.55;color:#444">
+          ${pep}
         </div>
-        <h2>Stage ${stageNum + 1} Selesai!</h2>
-        <p class="break-subtitle">${STAGE_LABELS[stageNum]}</p>
 
         <div class="break-stats">
           <div class="break-stat">
-            <div class="break-stat-num">${stageScore}%</div>
+            <div class="break-stat-num" style="color:${headlineColor}">${stageScore}%</div>
             <div class="break-stat-lbl">Skor Stage Ini</div>
           </div>
           <div class="break-stat">
@@ -2470,11 +2502,11 @@ function renderStageBreak(m) {
 
         <div class="break-tips">
           <strong>💡 Istirahat sejenak</strong>
-          <p>Ambil napas, minum air, regangkan badan. Stage berikutnya: <strong>${STAGE_LABELS[stageNum + 1]}</strong> dengan tingkat kesulitan lebih tinggi. Klik tombol di bawah saat sudah siap.</p>
+          <p>${firstName}, ambil napas, minum air, regangkan badan. Stage berikutnya: <strong>${STAGE_LABELS[stageNum + 1]}</strong>. Klik tombol di bawah saat kamu sudah siap.</p>
         </div>
 
         <button class="btn btn-primary btn-lg" onclick="continueToNextStage()">
-          Lanjut ke Stage ${stageNum + 2} →
+          Saya Siap, Lanjut ke Stage ${stageNum + 2} →
         </button>
       </div>
     </div>
@@ -2567,33 +2599,85 @@ async function submitExam() {
 
 // ============ RESULT ============
 async function renderResult(m, { score, correct, passed, session, wrongAnswers }) {
+  const fullName = (state.participant?.full_name || 'Peserta').trim();
+  const firstName = fullName.split(' ')[0];
+  const grade = getGrade(score);
   const color = passed ? '#10B981' : '#EF4444';
   const deg = (score / 100) * 360;
+
+  // Pesan personalisasi sesuai grade
+  let title, subtitle;
+  if (score >= 90) {
+    title = `🏆 LUAR BIASA, ${firstName.toUpperCase()}!`;
+    subtitle = `Performa hebat! Kamu meraih grade <strong style="color:#0A7C3A">A — Sangat Baik</strong>. Sertifikatmu sedang disiapkan...`;
+  } else if (score >= 80) {
+    title = `🎉 SELAMAT, ${firstName.toUpperCase()}!`;
+    subtitle = `Hasil yang sangat baik. Kamu meraih grade <strong style="color:#1D4ED8">B — Baik</strong>. Sertifikatmu sedang disiapkan...`;
+  } else if (passed) {
+    title = `✅ LULUS, ${firstName.toUpperCase()}!`;
+    subtitle = `Kamu berhasil lulus dengan grade <strong style="color:#B45309">C — Cukup</strong>. Sertifikatmu sedang disiapkan...`;
+  } else {
+    title = `Tetap Semangat, ${firstName}`;
+    subtitle = `Skor kamu <strong>${score.toFixed(0)}</strong>, masih kurang dari batas lulus <strong>${PASS_SCORE}</strong>. Pelajari ulang materinya & coba lagi — kamu pasti bisa!`;
+  }
 
   m.innerHTML = `
     <div class="result-card">
       <div class="score-ring" style="--score-color:${color};--score-deg:${deg}deg">
         <span>${score.toFixed(0)}</span>
       </div>
-      <div class="result-title" style="color:${color}">
-        ${passed ? '🎉 SELAMAT! LULUS' : '❌ BELUM LULUS'}
-      </div>
-      <div class="result-sub">
-        Jawaban benar: <strong>${correct}</strong> dari <strong>${state.examQuestions.length}</strong> soal • Skor minimal lulus: <strong>${PASS_SCORE}</strong>
-      </div>
+      ${passed ? `<div style="display:inline-flex;align-items:center;gap:10px;background:${grade.bg};color:${grade.color};padding:8px 18px;border-radius:24px;font-weight:800;font-size:18px;margin:8px 0">
+        Grade ${grade.letter} • ${grade.label}
+      </div>` : ''}
+      <div class="result-title" style="color:${color}">${title}</div>
+      <div class="result-sub">${subtitle}</div>
+      <div class="result-sub" style="margin-top:8px">Jawaban benar: <strong>${correct}</strong> dari <strong>${state.examQuestions.length}</strong> soal</div>
 
-
-      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px">
         ${passed
-          ? `<button class="btn btn-primary btn-lg" onclick="issueCertificate('${session.id}')">📜 Dapatkan Sertifikat</button>`
+          ? `<div id="autoCertStatus" style="font-size:13px;color:var(--text-muted)"><div class="loader" style="display:inline-block;width:18px;height:18px;border-width:2px;vertical-align:middle;margin-right:8px"></div>Membuat sertifikatmu...</div>`
           : `<button class="btn btn-primary btn-lg" onclick="route('materials')">📚 Pelajari Ulang</button>
-             <button class="btn btn-secondary btn-lg" onclick="startExam()">🔄 Ulangi Ujian</button>`
+             <button class="btn btn-secondary btn-lg" onclick="startExam()">🔄 Ulangi Ujian</button>
+             <button class="btn btn-outline btn-lg" onclick="route('home')">Kembali ke Beranda</button>`
         }
-        <button class="btn btn-outline btn-lg" onclick="route('home')">Kembali ke Beranda</button>
       </div>
     </div>
   `;
 
+  // Auto-issue cert tanpa klik tombol
+  if (passed) {
+    autoIssueCertificate(session.id);
+  }
+}
+
+async function autoIssueCertificate(sessionId) {
+  const statusEl = document.getElementById('autoCertStatus');
+  let cert = null;
+  let lastErr = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const certNumber = genCertNumber(state.currentAcademy.slug);
+    try {
+      const { data, error } = await db.from('academy_certificates').insert({
+        cert_number: certNumber,
+        participant_id: state.participant.id,
+        academy_id: state.currentAcademy.id,
+        exam_session_id: sessionId,
+        score: (await db.from('academy_exam_sessions').select('score').eq('id', sessionId).single()).data?.score ?? null,
+      }).select().single();
+      if (error) throw error;
+      cert = data;
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 3) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+    }
+  }
+  if (!cert) {
+    if (statusEl) statusEl.innerHTML = `<div class="alert alert-warn" style="text-align:left">Gagal membuat sertifikat: ${lastErr?.message || 'network'}.<br/><button class="btn btn-primary btn-lg" style="margin-top:10px" onclick="autoIssueCertificate('${sessionId}')">🔄 Coba Lagi</button></div>`;
+    return;
+  }
+  // Sukses → langsung tampilkan halaman sertifikat
+  setTimeout(() => route('certificate', cert), 600);
 }
 
 // ============ CERTIFICATE ============
@@ -2648,36 +2732,75 @@ async function issueCertificate(sessionId) {
   route('certificate', cert);
 }
 
+function getCertTier(score) {
+  if (score >= 90) return {
+    letter: 'A', label: 'DENGAN PUJIAN', sublabel: 'With Distinction',
+    borderColor: '#C9A227', innerBorder: '#FFD700',
+    sealBg: 'linear-gradient(135deg, #FFD700 0%, #B8860B 100%)',
+    sealColor: '#5C3D00', ribbonBg: '#C9A227',
+  };
+  if (score >= 80) return {
+    letter: 'B', label: 'BAIK', sublabel: 'Good Achievement',
+    borderColor: '#0A7C3A', innerBorder: '#FFE500',
+    sealBg: 'linear-gradient(135deg, #12A052 0%, #065E2B 100%)',
+    sealColor: '#FFFFFF', ribbonBg: '#0A7C3A',
+  };
+  return {
+    letter: 'C', label: 'LULUS', sublabel: 'Passed',
+    borderColor: '#1D4ED8', innerBorder: '#93C5FD',
+    sealBg: 'linear-gradient(135deg, #3B82F6 0%, #1E3A8A 100%)',
+    sealColor: '#FFFFFF', ribbonBg: '#1D4ED8',
+  };
+}
+
 async function renderCertificate(m, cert) {
   const { data: session } = await db.from('academy_exam_sessions').select('score').eq('id', cert.exam_session_id).single();
+  const score = session?.score ?? cert.score ?? 0;
   const verifyUrl = `${window.location.origin}${window.location.pathname}?verify=${cert.cert_number}`;
   const navLogoEl = document.querySelector('nav img');
   const plnLogoSrc = navLogoEl ? navLogoEl.src : (IMG.logo || '');
+  const tier = getCertTier(score);
+  const fullName = (state.participant?.full_name || 'Peserta').trim();
+  const firstName = fullName.split(' ')[0];
 
   m.innerHTML = `
     <div style="text-align:center;margin-bottom:20px">
-      <button class="btn btn-primary btn-lg" onclick="downloadCert()">📥 Download PDF</button>
-      <button class="btn btn-outline btn-lg" onclick="route('home')">Kembali</button>
+      <div style="display:inline-block;background:${tier.ribbonBg};color:white;padding:10px 22px;border-radius:24px;font-weight:800;font-size:15px;letter-spacing:1px;margin-bottom:14px">
+        🎓 SELAMAT, ${firstName.toUpperCase()}! Grade ${tier.letter}
+      </div>
+      <p style="color:var(--text-muted);font-size:13px;margin:0 0 14px">
+        Sertifikatmu sudah siap. Klik tombol di bawah untuk download PDF.
+      </p>
+      <button class="btn btn-primary btn-lg" onclick="downloadCert()">📥 Download Sertifikat (PDF)</button>
+      <button class="btn btn-outline btn-lg" onclick="route('home')">Kembali ke Beranda</button>
     </div>
     <div id="certWrap">
-      <div class="cert-container" id="certDoc">
-        <div class="cert-border"></div>
+      <div class="cert-container cert-tier-${tier.letter.toLowerCase()}" id="certDoc" style="border-color:${tier.borderColor}">
+        <div class="cert-border" style="border-color:${tier.innerBorder}"></div>
+
+        <!-- Tier seal kanan atas -->
+        <div class="cert-seal" style="background:${tier.sealBg};color:${tier.sealColor}">
+          <div class="cert-seal-letter">${tier.letter}</div>
+          <div class="cert-seal-label">${tier.label}</div>
+          <div class="cert-seal-sub">${tier.sublabel}</div>
+        </div>
+
         <div class="cert-header">
           <div class="cert-logo-row">
             <img src="${plnLogoSrc}" style="height:70px;width:auto;object-fit:contain;border-radius:8px;" alt="PLN Logo" crossorigin="anonymous" />
             <div class="cert-org">PT PLN (Persero)<small>Distribution Academy</small></div>
           </div>
-          <div class="cert-title">SERTIFIKAT</div>
-          <div class="cert-subtitle">Certificate of Completion</div>
+          <div class="cert-title">SERTIFIKAT ${tier.letter === 'A' ? 'DENGAN PUJIAN' : 'KELULUSAN'}</div>
+          <div class="cert-subtitle">Certificate of ${tier.letter === 'A' ? 'Distinction' : 'Completion'}</div>
         </div>
         <div class="cert-body">
-          <img src="${state.participant.photo_url}" class="cert-photo" crossorigin="anonymous" />
+          <img src="${state.participant.photo_url}" class="cert-photo" crossorigin="anonymous" style="border-color:${tier.innerBorder}"/>
           <p>Diberikan kepada</p>
-          <div class="cert-name">${state.participant.full_name}</div>
+          <div class="cert-name" style="color:${tier.borderColor};border-bottom-color:${tier.innerBorder}">${state.participant.full_name}</div>
           <p>${state.participant.nip ? 'NIP: ' + state.participant.nip + ' • ' : ''}${state.participant.unit || ''}</p>
           <p style="margin-top:16px">Telah menyelesaikan dan lulus</p>
           <div class="cert-academy">${state.currentAcademy.name}</div>
-          <p>dengan skor <strong style="color:var(--pln-green);font-size:20px">${session.score.toFixed(0)}</strong> / 100</p>
+          <p>dengan skor <strong style="color:${tier.borderColor};font-size:22px">${score.toFixed(0)}</strong> / 100 — Grade <strong style="color:${tier.borderColor};font-size:18px">${tier.letter}</strong> (${tier.label})</p>
         </div>
         <div class="cert-footer">
           <div class="cert-footer-col">
@@ -2699,7 +2822,7 @@ async function renderCertificate(m, cert) {
 
   new QRCode(document.getElementById('certQr'), {
     text: verifyUrl, width: 100, height: 100,
-    colorDark: '#003A70', colorLight: '#ffffff'
+    colorDark: tier.borderColor, colorLight: '#ffffff'
   });
 }
 
