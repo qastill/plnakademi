@@ -1361,7 +1361,41 @@ const state = {
   examStageQuestions: [], // 25 soal di stage saat ini
   examStartTime: null,
   examTimer: null,
+  examInProgress: false,
+  examSubmitting: false,
 };
+
+// ============ EXAM PERSISTENCE (anti hilang saat refresh) ============
+const EXAM_STORAGE_KEY = 'pln_acad_exam_v1';
+function persistExam() {
+  if (!state.examInProgress) return;
+  try {
+    localStorage.setItem(EXAM_STORAGE_KEY, JSON.stringify({
+      participant: state.participant,
+      currentAcademy: state.currentAcademy,
+      examQuestions: state.examQuestions,
+      examAnswers: state.examAnswers,
+      examCurrentIdx: state.examCurrentIdx,
+      examCurrentStage: state.examCurrentStage,
+      examStartTime: state.examStartTime,
+      savedAt: Date.now(),
+    }));
+  } catch (e) { /* quota / private mode — ignore */ }
+}
+function clearPersistedExam() {
+  try { localStorage.removeItem(EXAM_STORAGE_KEY); } catch (e) {}
+}
+function getPersistedExam() {
+  try {
+    const raw = localStorage.getItem(EXAM_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // hanya valid kalau < 6 jam dan punya soal
+    if (!data.examQuestions || !data.examQuestions.length) return null;
+    if (Date.now() - (data.savedAt || 0) > 6 * 60 * 60 * 1000) return null;
+    return data;
+  } catch (e) { return null; }
+}
 
 // ============ INIT ============
 async function init() {
@@ -1379,12 +1413,52 @@ async function init() {
       return;
     }
     state.academies = data;
+
+    // Cek apakah ada ujian yang belum selesai (refresh / tab tertutup)
+    const persisted = getPersistedExam();
+    if (persisted && persisted.participant && persisted.currentAcademy) {
+      const academyName = persisted.currentAcademy.name || 'academy';
+      const stage = (persisted.examCurrentStage || 0) + 1;
+      const total = persisted.examQuestions.length;
+      const answered = Object.keys(persisted.examAnswers || {}).length;
+      const ok = confirm(
+        `Anda memiliki ujian yang belum selesai:\n` +
+        `• Academy: ${academyName}\n` +
+        `• Stage: ${stage}/${EXAM_STAGES}\n` +
+        `• Sudah terjawab: ${answered}/${total} soal\n\n` +
+        `Lanjutkan ujian dari tempat terakhir?\n(OK = lanjut, Cancel = mulai ulang dari beranda)`
+      );
+      if (ok) {
+        state.participant = persisted.participant;
+        state.currentAcademy = persisted.currentAcademy;
+        state.examQuestions = persisted.examQuestions;
+        state.examAnswers = persisted.examAnswers || {};
+        state.examCurrentIdx = persisted.examCurrentIdx || 0;
+        state.examCurrentStage = persisted.examCurrentStage || 0;
+        state.examStartTime = persisted.examStartTime || Date.now();
+        state.examInProgress = true;
+        route('exam');
+        return;
+      } else {
+        clearPersistedExam();
+      }
+    }
+
     route('home');
   } catch (e) {
     console.error('Init error:', e);
     document.getElementById('main').innerHTML = `<div class="alert alert-warn" style="max-width:700px;margin:40px auto"><strong>Error:</strong> ${e.message}<br/><small>Cek console browser (F12).</small></div>`;
   }
 }
+
+// ============ BEFOREUNLOAD GUARD ============
+window.addEventListener('beforeunload', (e) => {
+  if (state.examInProgress && !state.examSubmitting) {
+    e.preventDefault();
+    e.returnValue = 'Ujian masih berlangsung. Yakin keluar?';
+    return e.returnValue;
+  }
+});
 
 // ============ ROUTER ============
 function route(page, param) {
@@ -1867,18 +1941,22 @@ async function submitBiodata() {
   if (!name || !email || !state.photoFile) { alert('Nama, email, dan foto wajib diisi!'); return; }
 
   const btn = event.target;
+  if (btn.disabled) return; // anti double-click
   btn.disabled = true; btn.textContent = 'Uploading foto...';
 
-  // Upload photo
-  const fileName = `${Date.now()}_${state.photoFile.name}`;
+  // Upload photo — gunakan random suffix untuk hindari collision saat 100 user simultan
+  const safeName = state.photoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const rand = Math.random().toString(36).substr(2, 8);
+  const fileName = `${Date.now()}_${rand}_${safeName}`;
   const { data: uploadData, error: uploadErr } = await supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     .storage.from('academy-photos').upload(fileName, state.photoFile);
-  if (uploadErr) { alert('Upload foto gagal: ' + uploadErr.message); btn.disabled = false; return; }
+  if (uploadErr) { alert('Upload foto gagal: ' + uploadErr.message); btn.disabled = false; btn.textContent = 'Mulai Ujian'; return; }
 
   const { data: urlData } = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     .storage.from('academy-photos').getPublicUrl(fileName);
 
   // Insert participant
+  btn.textContent = 'Menyimpan biodata...';
   const { data: p, error } = await db.from('academy_participants').insert({
     full_name: name,
     nip: document.getElementById('f_nip').value.trim() || null,
@@ -1889,7 +1967,7 @@ async function submitBiodata() {
     photo_url: urlData.publicUrl,
   }).select().single();
 
-  if (error) { alert('Gagal simpan biodata: ' + error.message); btn.disabled = false; return; }
+  if (error) { alert('Gagal simpan biodata: ' + error.message); btn.disabled = false; btn.textContent = 'Mulai Ujian'; return; }
   state.participant = p;
   closeBiodataModal();
   startExam();
@@ -2169,6 +2247,9 @@ async function startExam() {
   state.examCurrentIdx = 0;
   state.examCurrentStage = 0;
   state.examStartTime = Date.now();
+  state.examInProgress = true;
+  state.examSubmitting = false;
+  persistExam();
   route('exam');
 }
 
@@ -2267,6 +2348,7 @@ function renderQuestion() {
 function selectOption(letter) {
   const q = state.examQuestions[state.examCurrentIdx];
   state.examAnswers[q.id] = letter;
+  persistExam();
   renderQuestion();
 }
 
@@ -2275,12 +2357,14 @@ function nextQ() {
   const stageQs = getStageQuestions();
   if (localIdx < stageQs.length - 1) {
     state.examCurrentIdx++;
+    persistExam();
     renderQuestion();
   } else {
     // Akhir stage
     if (state.examCurrentStage < EXAM_STAGES - 1) {
       // Stop timer dan masuk break screen
       clearInterval(state.examTimer);
+      persistExam();
       route('stagebreak');
     } else {
       // Stage terakhir, submit
@@ -2293,6 +2377,7 @@ function prevQ() {
   const localIdx = getStageLocalIdx();
   if (localIdx > 0) {
     state.examCurrentIdx--;
+    persistExam();
     renderQuestion();
   }
 }
@@ -2300,6 +2385,7 @@ function prevQ() {
 function continueToNextStage() {
   state.examCurrentStage++;
   state.examCurrentIdx = state.examCurrentStage * QUESTIONS_PER_STAGE;
+  persistExam();
   route('exam');
 }
 
@@ -2403,7 +2489,14 @@ function startTimer() {
 }
 
 async function submitExam() {
+  if (state.examSubmitting) return; // anti double-submit
+  state.examSubmitting = true;
   clearInterval(state.examTimer);
+
+  // Disable tombol kalau ada
+  const nextBtn = document.getElementById('nextBtn');
+  if (nextBtn) { nextBtn.disabled = true; nextBtn.textContent = 'Mengirim hasil...'; }
+
   let correct = 0;
   const wrongAnswers = [];
   state.examQuestions.forEach(q => {
@@ -2413,7 +2506,7 @@ async function submitExam() {
   const score = (correct / state.examQuestions.length) * 100;
   const passed = score >= PASS_SCORE;
 
-  const { data: session } = await db.from('academy_exam_sessions').insert({
+  const payload = {
     participant_id: state.participant.id,
     academy_id: state.currentAcademy.id,
     score: score,
@@ -2422,8 +2515,40 @@ async function submitExam() {
     passed: passed,
     answers: state.examAnswers,
     finished_at: new Date().toISOString(),
-  }).select().single();
+  };
 
+  // Retry hingga 3x dengan exponential backoff bila gagal kirim
+  let session = null;
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { data, error } = await db.from('academy_exam_sessions').insert(payload).select().single();
+      if (error) throw error;
+      session = data;
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 2) await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+    }
+  }
+
+  if (!session) {
+    // Simpan backup lokal supaya tidak hilang
+    try {
+      const pending = JSON.parse(localStorage.getItem('pln_acad_pending_sessions') || '[]');
+      pending.push({ payload, savedAt: Date.now() });
+      localStorage.setItem('pln_acad_pending_sessions', JSON.stringify(pending));
+    } catch (e) {}
+    state.examSubmitting = false;
+    if (nextBtn) { nextBtn.disabled = false; nextBtn.textContent = 'Coba Submit Lagi'; }
+    alert('Gagal mengirim hasil ke server (' + (lastErr?.message || 'network') + ').\nHasil sementara tersimpan di perangkat. Silakan cek koneksi & klik tombol untuk submit ulang.');
+    return;
+  }
+
+  // Sukses → bersihkan persisted exam, lanjut ke result
+  clearPersistedExam();
+  state.examInProgress = false;
+  state.examSubmitting = false;
   route('result', { score, correct, passed, session, wrongAnswers });
 }
 
@@ -2459,17 +2584,53 @@ async function renderResult(m, { score, correct, passed, session, wrongAnswers }
 }
 
 // ============ CERTIFICATE ============
-async function issueCertificate(sessionId) {
-  // Generate cert number
-  const certNumber = `PLN-ACAD/${state.currentAcademy.slug.toUpperCase()}/${new Date().getFullYear()}/${Math.random().toString(36).substr(2,6).toUpperCase()}`;
+function genCertNumber(slug) {
+  const yr = new Date().getFullYear();
+  // 10 char base36 random + 4 char timestamp suffix → ~ 36^10 * 10000 kombinasi, sangat aman
+  const rand = (Math.random().toString(36).substr(2, 8) + Math.random().toString(36).substr(2, 8)).toUpperCase().substr(0, 10);
+  const tsTail = Date.now().toString(36).toUpperCase().slice(-4);
+  return `PLN-ACAD/${slug.toUpperCase()}/${yr}/${rand}${tsTail}`;
+}
 
-  const { data: cert } = await db.from('academy_certificates').insert({
-    cert_number: certNumber,
-    participant_id: state.participant.id,
-    academy_id: state.currentAcademy.id,
-    exam_session_id: sessionId,
-    score: (await db.from('academy_exam_sessions').select('score').eq('id', sessionId).single()).data.score,
-  }).select().single();
+async function issueCertificate(sessionId) {
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = 'Membuat sertifikat...'; }
+
+  // Ambil score dulu (sekali)
+  let scoreVal = null;
+  try {
+    const { data: sd } = await db.from('academy_exam_sessions').select('score').eq('id', sessionId).single();
+    scoreVal = sd?.score ?? null;
+  } catch (e) { /* lanjut tetap */ }
+
+  // Insert dengan retry kalau collision nomor sertifikat
+  let cert = null;
+  let lastErr = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const certNumber = genCertNumber(state.currentAcademy.slug);
+    try {
+      const { data, error } = await db.from('academy_certificates').insert({
+        cert_number: certNumber,
+        participant_id: state.participant.id,
+        academy_id: state.currentAcademy.id,
+        exam_session_id: sessionId,
+        score: scoreVal,
+      }).select().single();
+      if (error) throw error;
+      cert = data;
+      break;
+    } catch (e) {
+      lastErr = e;
+      // 23505 = unique violation → coba lagi dengan nomor baru
+      if (attempt < 3) await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+    }
+  }
+
+  if (!cert) {
+    if (btn) { btn.disabled = false; btn.textContent = '📜 Coba Dapatkan Sertifikat Lagi'; }
+    alert('Gagal membuat sertifikat (' + (lastErr?.message || 'network') + ').\nSilakan klik tombol lagi atau hubungi panitia.');
+    return;
+  }
 
   route('certificate', cert);
 }
